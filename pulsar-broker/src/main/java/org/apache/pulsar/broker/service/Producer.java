@@ -152,14 +152,19 @@ public class Producer {
     }
 
     public void publishMessage(long producerId, long sequenceId, ByteBuf headersAndPayload, long batchSize,
-            boolean isChunked) {
+                               boolean isChunked, String keyVersion) {
         if (checkAndStartPublish(producerId, sequenceId, headersAndPayload, batchSize)) {
-            publishMessageToTopic(headersAndPayload, sequenceId, batchSize, isChunked);
+            publishMessageToTopic(headersAndPayload, sequenceId, batchSize, isChunked, keyVersion);
         }
     }
 
     public void publishMessage(long producerId, long lowestSequenceId, long highestSequenceId,
-            ByteBuf headersAndPayload, long batchSize, boolean isChunked) {
+                               ByteBuf headersAndPayload, long batchSize, boolean isChunked) {
+        publishMessage(producerId, lowestSequenceId, highestSequenceId, headersAndPayload, batchSize, isChunked, null);
+    }
+
+    public void publishMessage(long producerId, long lowestSequenceId, long highestSequenceId,
+            ByteBuf headersAndPayload, long batchSize, boolean isChunked, String keyVersion) {
         if (lowestSequenceId > highestSequenceId) {
             cnx.execute(() -> {
                 cnx.getCommandSender().sendSendError(producerId, highestSequenceId, ServerError.MetadataError,
@@ -169,7 +174,7 @@ public class Producer {
             return;
         }
         if (checkAndStartPublish(producerId, highestSequenceId, headersAndPayload, batchSize)) {
-            publishMessageToTopic(headersAndPayload, lowestSequenceId, highestSequenceId, batchSize, isChunked);
+            publishMessageToTopic(headersAndPayload, lowestSequenceId, highestSequenceId, batchSize, isChunked, keyVersion);
         }
     }
 
@@ -214,19 +219,20 @@ public class Producer {
         return true;
     }
 
-    private void publishMessageToTopic(ByteBuf headersAndPayload, long sequenceId, long batchSize, boolean isChunked) {
+    private void publishMessageToTopic(ByteBuf headersAndPayload, long sequenceId, long batchSize, boolean isChunked,
+                                       String keyVersion) {
         topic.publishMessage(headersAndPayload,
                 MessagePublishContext.get(this, sequenceId, msgIn,
                         headersAndPayload.readableBytes(), batchSize,
-                        isChunked, System.nanoTime()));
+                        isChunked, System.nanoTime(), keyVersion));
     }
 
     private void publishMessageToTopic(ByteBuf headersAndPayload, long lowestSequenceId, long highestSequenceId,
-                                       long batchSize, boolean isChunked) {
+                                       long batchSize, boolean isChunked, String keyVersion) {
         topic.publishMessage(headersAndPayload,
                 MessagePublishContext.get(this, lowestSequenceId,
                         highestSequenceId, msgIn, headersAndPayload.readableBytes(), batchSize,
-                        isChunked, System.nanoTime()));
+                        isChunked, System.nanoTime(), keyVersion));
     }
 
     private boolean verifyChecksum(ByteBuf headersAndPayload) {
@@ -308,6 +314,7 @@ public class Producer {
         private int msgSize;
         private long batchSize;
         private boolean chunked;
+        private String keyVersion;
 
         private long startTimeNs;
 
@@ -317,16 +324,23 @@ public class Producer {
         private long highestSequenceId;
         private long originalHighestSequenceId;
 
+        @Override
         public String getProducerName() {
             return producer.getProducerName();
         }
 
+        @Override
         public long getSequenceId() {
             return sequenceId;
         }
 
         public boolean isChunked() {
             return chunked;
+        }
+
+        @Override
+        public String getKeyVersion() {
+            return keyVersion;
         }
 
         @Override
@@ -432,7 +446,12 @@ public class Producer {
         }
 
         static MessagePublishContext get(Producer producer, long sequenceId, Rate rateIn, int msgSize,
-                long batchSize, boolean chunked, long startTimeNs) {
+                                         long batchSize, boolean chunked, long startTimeNs) {
+            return get(producer, sequenceId, rateIn, msgSize, batchSize, chunked, startTimeNs, null);
+        }
+
+        static MessagePublishContext get(Producer producer, long sequenceId, Rate rateIn, int msgSize,
+                long batchSize, boolean chunked, long startTimeNs, String keyVersion) {
             MessagePublishContext callback = RECYCLER.get();
             callback.producer = producer;
             callback.sequenceId = sequenceId;
@@ -443,11 +462,12 @@ public class Producer {
             callback.originalProducerName = null;
             callback.originalSequenceId = -1L;
             callback.startTimeNs = startTimeNs;
+            callback.keyVersion = keyVersion;
             return callback;
         }
 
         static MessagePublishContext get(Producer producer, long lowestSequenceId, long highestSequenceId, Rate rateIn,
-                int msgSize, long batchSize, boolean chunked, long startTimeNs) {
+                int msgSize, long batchSize, boolean chunked, long startTimeNs, String keyVersion) {
             MessagePublishContext callback = RECYCLER.get();
             callback.producer = producer;
             callback.sequenceId = lowestSequenceId;
@@ -459,6 +479,7 @@ public class Producer {
             callback.originalSequenceId = -1L;
             callback.startTimeNs = startTimeNs;
             callback.chunked = chunked;
+            callback.keyVersion = keyVersion;
             return callback;
         }
 
@@ -474,6 +495,7 @@ public class Producer {
         }
 
         private static final Recycler<MessagePublishContext> RECYCLER = new Recycler<MessagePublishContext>() {
+            @Override
             protected MessagePublishContext newObject(Handle<MessagePublishContext> handle) {
                 return new MessagePublishContext(handle);
             }
@@ -492,6 +514,7 @@ public class Producer {
             batchSize = 0L;
             startTimeNs = -1L;
             chunked = false;
+            keyVersion = null;
             recyclerHandle.recycle(this);
         }
     }
@@ -650,7 +673,7 @@ public class Producer {
         checkAndStartPublish(producerId, sequenceId, headersAndPayload, batchSize);
         topic.publishTxnMessage(txnID, headersAndPayload,
                 MessagePublishContext.get(this, sequenceId, highSequenceId, msgIn,
-                        headersAndPayload.readableBytes(), batchSize, isChunked, System.nanoTime()));
+                        headersAndPayload.readableBytes(), batchSize, isChunked, System.nanoTime(), null));
     }
 
     public SchemaVersion getSchemaVersion() {

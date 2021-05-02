@@ -26,6 +26,7 @@ import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -41,7 +42,8 @@ import org.apache.pulsar.common.api.proto.CommandSubscribe.SubType;
 @AllArgsConstructor
 @Getter
 @Setter
-public class TopicPolicies {
+@EqualsAndHashCode(callSuper=true)
+public class TopicPolicies extends SystemTopicMetaData {
 
     private Map<String, BacklogQuota> backLogQuotaMap = Maps.newHashMap();
     private PersistencePolicies persistence = null;

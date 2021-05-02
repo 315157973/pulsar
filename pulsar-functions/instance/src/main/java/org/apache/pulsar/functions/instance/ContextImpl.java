@@ -571,6 +571,12 @@ class ContextImpl implements Context, SinkContext, SourceContext, AutoCloseable 
         }
 
         @Override
+        public TypedMessageBuilder<O> systemTopicKeyVersion(String key) {
+            underlyingBuilder.systemTopicKeyVersion(key);
+            return this;
+        }
+
+        @Override
         public TypedMessageBuilder<O> key(String key) {
             underlyingBuilder.key(key);
             return this;

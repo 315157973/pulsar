@@ -1331,10 +1331,12 @@ public class ServerCnx extends PulsarHandler implements TransportCnx {
         // Persist the message
         if (send.hasHighestSequenceId() && send.getSequenceId() <= send.getHighestSequenceId()) {
             producer.publishMessage(send.getProducerId(), send.getSequenceId(), send.getHighestSequenceId(),
-                    headersAndPayload, send.getNumMessages(), send.isIsChunk());
+                    headersAndPayload, send.getNumMessages(), send.isIsChunk(),
+                    send.hasSystemTopicKeyVersion() ? send.getSystemTopicKeyVersion() : null);
         } else {
             producer.publishMessage(send.getProducerId(), send.getSequenceId(), headersAndPayload,
-                    send.getNumMessages(), send.isIsChunk());
+                    send.getNumMessages(), send.isIsChunk(),
+                    send.hasSystemTopicKeyVersion() ? send.getSystemTopicKeyVersion() : null);
         }
     }
 

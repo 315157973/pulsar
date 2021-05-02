@@ -16,27 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pulsar.common.events;
+package org.apache.pulsar.common.policies.data;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.apache.pulsar.common.policies.data.TopicPolicies;
 
-/**
- * Topic policies event.
- */
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class TopicPoliciesEvent {
+public class SystemTopicMetaData {
 
-    private String domain;
-    private String tenant;
-    private String namespace;
-    private String topic;
-    private long version;
-    private TopicPolicies policies;
+    private long metaDataVersion;
+
 }

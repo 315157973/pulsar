@@ -144,6 +144,13 @@ public class TypedMessageBuilderImpl<T> implements TypedMessageBuilder<T> {
     }
 
     @Override
+    public TypedMessageBuilder<T> systemTopicKeyVersion(String keyVersion) {
+        checkArgument(keyVersion != null, "Need Non-Null keyVersion");
+        msgMetadata.setSystemTopicKeyVersion(keyVersion);
+        return this;
+    }
+
+    @Override
     public TypedMessageBuilder<T> value(T value) {
         if (value == null) {
             msgMetadata.setNullValue(true);

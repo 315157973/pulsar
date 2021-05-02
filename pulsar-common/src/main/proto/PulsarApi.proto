@@ -158,6 +158,8 @@ message MessageMetadata {
 
     // Indicate if the message partition key is set
     optional bool null_partition_key = 30 [default = false];
+    // version of system topic meta dates
+    optional string system_topic_key_version = 31;
 }
 
 message SingleMessageMetadata {
@@ -493,6 +495,7 @@ message CommandSend {
     /// Add highest sequence id to support batch message with external sequence id
     optional uint64 highest_sequence_id = 6 [default = 0];
     optional bool is_chunk     =7 [default = false];
+    optional string system_topic_key_version = 8;
 }
 
 message CommandSendReceipt {

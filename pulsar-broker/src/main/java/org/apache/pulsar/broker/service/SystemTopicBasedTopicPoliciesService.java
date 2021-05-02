@@ -82,6 +82,7 @@ public class SystemTopicBasedTopicPoliciesService implements TopicPoliciesServic
             if (ex != null) {
                 result.completeExceptionally(ex);
             } else {
+                long version = policies.getMetaDataVersion() + 1;
                 writer.writeAsync(
                         PulsarEvent.builder()
                                 .actionType(ActionType.UPDATE)
@@ -93,6 +94,7 @@ public class SystemTopicBasedTopicPoliciesService implements TopicPoliciesServic
                                 .namespace(topicName.getNamespaceObject().getLocalName())
                                 .topic(topicName.getLocalName())
                                 .policies(policies)
+                                .version(version)
                                 .build())
                         .build()).whenComplete(((messageId, e) -> {
                             if (e != null) {
@@ -281,9 +283,11 @@ public class SystemTopicBasedTopicPoliciesService implements TopicPoliciesServic
     private void refreshTopicPoliciesCache(Message<PulsarEvent> msg) {
         if (EventType.TOPIC_POLICY.equals(msg.getValue().getEventType())) {
             TopicPoliciesEvent event = msg.getValue().getTopicPoliciesEvent();
+            TopicPolicies policies = event.getPolicies();
+            policies.setMetaDataVersion(event.getVersion());
             policiesCache.put(
                     TopicName.get(event.getDomain(), event.getTenant(), event.getNamespace(), event.getTopic()),
-                    event.getPolicies()
+                    policies
             );
         }
     }

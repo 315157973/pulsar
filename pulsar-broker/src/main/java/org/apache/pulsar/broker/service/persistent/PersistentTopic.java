@@ -447,7 +447,7 @@ public class PersistentTopic extends AbstractTopic
         return ledger.getNumberOfEntries();
     }
 
-    private void decrementPendingWriteOpsAndCheck() {
+    protected void decrementPendingWriteOpsAndCheck() {
         long pending = pendingWriteOps.decrementAndGet();
         if (pending == 0 && isFenced && !isClosingOrDeleting) {
             synchronized (this) {

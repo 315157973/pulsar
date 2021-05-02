@@ -113,9 +113,9 @@ import org.apache.pulsar.broker.service.BrokerServiceException.ServerMetadataExc
 import org.apache.pulsar.broker.service.BrokerServiceException.ServiceUnitNotReadyException;
 import org.apache.pulsar.broker.service.nonpersistent.NonPersistentTopic;
 import org.apache.pulsar.broker.service.persistent.DispatchRateLimiter;
+import org.apache.pulsar.broker.service.persistent.PersistentSystemTopic;
 import org.apache.pulsar.broker.service.persistent.PersistentDispatcherMultipleConsumers;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
-import org.apache.pulsar.broker.service.persistent.SystemTopic;
 import org.apache.pulsar.broker.stats.ClusterReplicationMetrics;
 import org.apache.pulsar.broker.stats.prometheus.metrics.ObserverGauge;
 import org.apache.pulsar.broker.stats.prometheus.metrics.Summary;
@@ -1233,7 +1233,7 @@ public class BrokerService implements Closeable, ZooKeeperCacheListener<Policies
                         public void openLedgerComplete(ManagedLedger ledger, Object ctx) {
                             try {
                                 PersistentTopic persistentTopic = isSystemTopic(topic)
-                                        ? new SystemTopic(topic, ledger, BrokerService.this)
+                                        ? new PersistentSystemTopic(topic, ledger, BrokerService.this)
                                         : new PersistentTopic(topic, ledger, BrokerService.this);
                                 CompletableFuture<Void> replicationFuture = persistentTopic.checkReplication();
                                 replicationFuture.thenCompose(v -> {

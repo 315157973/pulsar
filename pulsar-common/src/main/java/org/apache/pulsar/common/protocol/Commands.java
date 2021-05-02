@@ -467,7 +467,8 @@ public class Commands {
         return newSend(producerId, sequenceId, -1 /* highestSequenceId */, numMessaegs,
                 messageMetadata.hasTxnidLeastBits() ? messageMetadata.getTxnidLeastBits() : -1,
                 messageMetadata.hasTxnidMostBits() ? messageMetadata.getTxnidMostBits() : -1,
-                checksumType, messageMetadata, payload);
+                checksumType, messageMetadata, payload,
+                messageMetadata.hasSystemTopicKeyVersion() ? messageMetadata.getSystemTopicKeyVersion() : null);
     }
 
     public static ByteBufPair newSend(long producerId, long lowestSequenceId, long highestSequenceId, int numMessaegs,
@@ -475,12 +476,13 @@ public class Commands {
         return newSend(producerId, lowestSequenceId, highestSequenceId, numMessaegs,
                 messageMetadata.hasTxnidLeastBits() ? messageMetadata.getTxnidLeastBits() : -1,
                 messageMetadata.hasTxnidMostBits() ? messageMetadata.getTxnidMostBits() : -1,
-                checksumType, messageMetadata, payload);
+                checksumType, messageMetadata, payload,
+                messageMetadata.hasSystemTopicKeyVersion() ? messageMetadata.getSystemTopicKeyVersion() : null);
     }
 
     public static ByteBufPair newSend(long producerId, long sequenceId, long highestSequenceId, int numMessages,
                                       long txnIdLeastBits, long txnIdMostBits, ChecksumType checksumType,
-            MessageMetadata messageData, ByteBuf payload) {
+            MessageMetadata messageData, ByteBuf payload, String keyVersion) {
         BaseCommand cmd = localCmd(Type.SEND);
         CommandSend send = cmd.setSend()
                 .setProducerId(producerId)
@@ -496,6 +498,9 @@ public class Commands {
         }
         if (txnIdMostBits >= 0) {
             send.setTxnidMostBits(txnIdMostBits);
+        }
+        if (keyVersion != null) {
+            send.setSystemTopicKeyVersion(keyVersion);
         }
         if (messageData.hasTotalChunkMsgSize() && messageData.getTotalChunkMsgSize() > 1) {
             send.setIsChunk(true);

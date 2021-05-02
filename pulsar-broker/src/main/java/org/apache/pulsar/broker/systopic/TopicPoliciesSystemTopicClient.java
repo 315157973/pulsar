@@ -43,6 +43,7 @@ public class TopicPoliciesSystemTopicClient extends SystemTopicClientBase<Pulsar
     @Override
     protected  CompletableFuture<Writer<PulsarEvent>> newWriterAsyncInternal() {
         return client.newProducer(Schema.AVRO(PulsarEvent.class))
+                .enableBatching(false)
                 .topic(topicName.toString())
                 .createAsync().thenCompose(producer -> {
                     if (log.isDebugEnabled()) {
@@ -85,7 +86,9 @@ public class TopicPoliciesSystemTopicClient extends SystemTopicClientBase<Pulsar
 
         @Override
         public CompletableFuture<MessageId> writeAsync(PulsarEvent event) {
-            return producer.newMessage().key(getEventKey(event)).value(event).sendAsync();
+            String key = getEventKey(event);
+            String keyVersion = key + "_" + event.getTopicPoliciesEvent().getVersion();
+            return producer.newMessage().systemTopicKeyVersion(keyVersion).key(key).value(event).sendAsync();
         }
 
         private String getEventKey(PulsarEvent event) {

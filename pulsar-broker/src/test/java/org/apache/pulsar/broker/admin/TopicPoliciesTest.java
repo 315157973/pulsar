@@ -53,6 +53,7 @@ import org.apache.pulsar.common.policies.data.PublishRate;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.SubscribeRate;
 import org.apache.pulsar.common.policies.data.TenantInfo;
+import org.apache.pulsar.common.policies.data.TopicPolicies;
 import org.awaitility.Awaitility;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -2129,6 +2130,31 @@ public class TopicPoliciesTest extends MockedPulsarServiceBaseTest {
         consumer2.close();
         consumer3.close();
         producer.close();
+    }
+
+    @Test
+    public void testPoliciesVersion() throws Exception {
+        final String topic = testTopic + UUID.randomUUID();
+        pulsarClient.newProducer().topic(topic).create().close();
+        Awaitility.await()
+                .until(() -> pulsar.getTopicPoliciesService().cacheIsInitialized(TopicName.get(topic)));
+        admin.topics().setMaxConsumers(topic, 999);
+        Awaitility.await().untilAsserted(() -> assertNotNull(admin.topics().getMaxConsumers(topic)));
+        TopicPolicies topicPolicies = pulsar.getBrokerService().getTopicPolicies(TopicName.get(topic));
+        assertEquals(topicPolicies.getMetaDataVersion(), 1);
+        Thread.sleep(1000);
+        admin.topics().setMaxConsumers(topic, 888);
+        Awaitility.await().untilAsserted(() -> assertEquals(admin.topics().getMaxConsumers(topic).intValue(), 888));
+        topicPolicies = pulsar.getBrokerService().getTopicPolicies(TopicName.get(topic));
+        assertEquals(topicPolicies.getMetaDataVersion(), 2);
+        topicPolicies.setMetaDataVersion(1);
+        try {
+            pulsar.getTopicPoliciesService().updateTopicPoliciesAsync(TopicName.get(topic), topicPolicies).get();
+            fail();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 
     @Test(timeOut = 20000)
