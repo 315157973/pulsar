@@ -33,7 +33,9 @@ import io.netty.buffer.ByteBuf;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -810,24 +812,45 @@ public class ReplicatorTest extends ReplicatorTestBase {
         Awaitility.await().untilAsserted(() -> assertNotNull(admin2.topics().getPartitionedTopicList(namespace)));
         Awaitility.await().untilAsserted(() -> assertEquals(admin2.topics().getPartitionedTopicList(namespace).get(0)
                 , persistentTopicName));
+        // produce and consume in same cluster
+        for (URL url : Arrays.asList(url1, url2)) {
+            @Cleanup
+            PulsarClient client = PulsarClient.builder().serviceUrl(url.toString()).build();
+            @Cleanup
+            Consumer<byte[]> consumer = client.newConsumer().topic(persistentTopicName)
+                    .subscriptionName("sub").subscribe();
+            @Cleanup
+            Producer<byte[]> producer = client.newProducer().topic(persistentTopicName)
+                    .enableBatching(false)
+                    .create();
+            producer.send("msg".getBytes(StandardCharsets.UTF_8));
+            assertNotNull(consumer.receive(1, TimeUnit.SECONDS));
+        }
+        //produce and consume in different cluster
         @Cleanup
-        PulsarClient client = PulsarClient.builder().serviceUrl(url2.toString()).build();
+        PulsarClient client2 = PulsarClient.builder().serviceUrl(url2.toString()).build();
+        @Cleanup
+        Consumer<byte[]> consumer = client2.newConsumer().topic(persistentTopicName)
+                .subscriptionName("sub").subscribe();
+        @Cleanup
+        PulsarClient client = PulsarClient.builder().serviceUrl(url1.toString()).build();
+        @Cleanup
         Producer<byte[]> producer = client.newProducer().topic(persistentTopicName)
                 .enableBatching(false)
                 .create();
         producer.send("msg".getBytes(StandardCharsets.UTF_8));
-        producer.close();
-        Consumer<byte[]> consumer = client.newConsumer().topic(persistentTopicName)
-                .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
-                .subscriptionName("sub").subscribe();
-        assertNotNull(consumer.receive(1, TimeUnit.SECONDS));
-        consumer.close();
-
+        assertNotNull(consumer.receive(3, TimeUnit.SECONDS));
+        // update partition num
+        assertEquals(admin2.namespaces().getTopics(namespace).size(), 3);
         assertEquals(admin2.topics().getPartitionedTopicMetadata(persistentTopicName).partitions, 3);
+
         admin1.topics().updatePartitionedTopic(persistentTopicName, 4);
         assertEquals(admin2.topics().getPartitionedTopicMetadata(persistentTopicName).partitions, 4);
+        assertEquals(admin2.namespaces().getTopics(namespace).size(), 4);
+
         admin2.topics().updatePartitionedTopic(persistentTopicName, 5);
         assertEquals(admin2.topics().getPartitionedTopicMetadata(persistentTopicName).partitions, 5);
+        assertEquals(admin2.namespaces().getTopics(namespace).size(), 5);
     }
 
     /**
