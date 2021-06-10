@@ -24,6 +24,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
+import static org.testng.AssertJUnit.assertNotNull;
 
 import com.google.common.collect.Sets;
 import com.scurrilous.circe.checksum.Crc32cIntChecksum;
@@ -32,9 +33,11 @@ import io.netty.buffer.ByteBuf;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -62,6 +65,7 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.RawMessage;
 import org.apache.pulsar.client.api.RawReader;
 import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 import org.apache.pulsar.client.api.TypedMessageBuilder;
 import org.apache.pulsar.client.impl.ProducerImpl;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
@@ -791,6 +795,39 @@ public class ReplicatorTest extends ReplicatorTestBase {
 
         p1.close();
         reader2.closeAsync().get();
+    }
+
+    @Test
+    public void testReplicatorWithPartitionedTopic() throws Exception {
+        final String namespace = "pulsar/partitionedNs-" + UUID.randomUUID();
+        final String persistentTopicName = "persistent://" + namespace + "/partTopic" + UUID.randomUUID();
+
+        admin1.namespaces().createNamespace(namespace);
+        admin1.namespaces().setNamespaceReplicationClusters(namespace, Sets.newHashSet("r1", "r2", "r3"));
+
+        admin1.topics().createPartitionedTopic(persistentTopicName, 3);
+
+        Awaitility.await().untilAsserted(() -> assertNotNull(admin2.topics().getPartitionedTopicList(namespace)));
+        Awaitility.await().untilAsserted(() -> assertEquals(admin2.topics().getPartitionedTopicList(namespace).get(0)
+                , persistentTopicName));
+        @Cleanup
+        PulsarClient client = PulsarClient.builder().serviceUrl(url2.toString()).build();
+        Producer<byte[]> producer = client.newProducer().topic(persistentTopicName)
+                .enableBatching(false)
+                .create();
+        producer.send("msg".getBytes(StandardCharsets.UTF_8));
+        producer.close();
+        Consumer<byte[]> consumer = client.newConsumer().topic(persistentTopicName)
+                .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                .subscriptionName("sub").subscribe();
+        assertNotNull(consumer.receive(1, TimeUnit.SECONDS));
+        consumer.close();
+
+        assertEquals(admin2.topics().getPartitionedTopicMetadata(persistentTopicName).partitions, 3);
+        admin1.topics().updatePartitionedTopic(persistentTopicName, 4);
+        assertEquals(admin2.topics().getPartitionedTopicMetadata(persistentTopicName).partitions, 4);
+        admin2.topics().updatePartitionedTopic(persistentTopicName, 5);
+        assertEquals(admin2.topics().getPartitionedTopicMetadata(persistentTopicName).partitions, 5);
     }
 
     /**
