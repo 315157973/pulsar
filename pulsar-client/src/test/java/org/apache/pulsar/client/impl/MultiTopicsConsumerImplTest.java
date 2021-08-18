@@ -167,7 +167,7 @@ public class MultiTopicsConsumerImplTest {
         // indicating that closeAsync was called
         assertEquals(impl.getState(), HandlerState.State.Uninitialized);
         try {
-            completeFuture.get(15, TimeUnit.MILLISECONDS);
+            completeFuture.get(15, TimeUnit.SECONDS);
         } catch (Throwable ex) {
             // just ignore the exception
         }
