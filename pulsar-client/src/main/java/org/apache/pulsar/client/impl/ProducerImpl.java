@@ -936,7 +936,7 @@ public class ProducerImpl<T> extends ProducerBase<T> implements TimerTask, Conne
         if (previousState != State.Terminated && previousState != State.Closed) {
             log.info("[{}] [{}] The topic has been terminated", topic, producerName);
             setClientCnx(null);
-            synchronized (this) {
+            synchronized (ProducerImpl.this) {
                 failPendingMessages(cnx,
                         new PulsarClientException.TopicTerminatedException(
                                 format("The topic %s that the producer %s produces to has been terminated", topic, producerName)));
@@ -1403,7 +1403,7 @@ public class ProducerImpl<T> extends ProducerBase<T> implements TimerTask, Conne
                         return null;
                     }
                     if (cause instanceof PulsarClientException.ProducerBlockedQuotaExceededException) {
-                        synchronized (this) {
+                        synchronized (ProducerImpl.this) {
                             log.warn("[{}] [{}] Topic backlog quota exceeded. Throwing Exception on producer.", topic,
                                     producerName);
 
@@ -1424,14 +1424,14 @@ public class ProducerImpl<T> extends ProducerBase<T> implements TimerTask, Conne
 
                     if (cause instanceof PulsarClientException.TopicTerminatedException) {
                         setState(State.Terminated);
-                        synchronized (this) {
+                        synchronized (ProducerImpl.this) {
                             failPendingMessages(cnx(), (PulsarClientException) cause);
                         }
                         producerCreatedFuture.completeExceptionally(cause);
                         client.cleanupProducer(this);
                     } else if (cause instanceof PulsarClientException.ProducerFencedException) {
                         setState(State.ProducerFenced);
-                        synchronized (this) {
+                        synchronized (ProducerImpl.this) {
                             failPendingMessages(cnx(), (PulsarClientException) cause);
                         }
                         producerCreatedFuture.completeExceptionally(cause);
@@ -1568,7 +1568,7 @@ public class ProducerImpl<T> extends ProducerBase<T> implements TimerTask, Conne
 
         long timeToWaitMs;
 
-        synchronized (this) {
+        synchronized (ProducerImpl.this) {
             // If it's closing/closed we need to ignore this timeout and not schedule next timeout.
             if (getState() == State.Closing || getState() == State.Closed) {
                 return;
