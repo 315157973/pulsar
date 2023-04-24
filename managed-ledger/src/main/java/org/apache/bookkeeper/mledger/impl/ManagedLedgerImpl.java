@@ -2732,7 +2732,7 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
             for (LedgerInfo ls : offloadedLedgersToDelete) {
                 log.info("[{}] Deleting offloaded ledger {} from bookkeeper - size: {}", name, ls.getLedgerId(),
                         ls.getSize());
-                futures.add(asyncDeleteLedger(ls.getLedgerId(), DEFAULT_LEDGER_DELETE_RETRIES, null));
+                futures.add(asyncDeleteLedger(ls.getLedgerId(), DEFAULT_LEDGER_DELETE_RETRIES));
             }
             if (futures.isEmpty()) {
                 metadataMutex.unlock();
@@ -2953,13 +2953,13 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         if (!info.getOffloadContext().getBookkeeperDeleted()) {
             // only delete if it hasn't been previously deleted for offload
-            futures.add(asyncDeleteLedger(ledgerId, DEFAULT_LEDGER_DELETE_RETRIES, null));
+            futures.add(asyncDeleteLedger(ledgerId, DEFAULT_LEDGER_DELETE_RETRIES));
         }
         if (info.getOffloadContext().hasUidMsb()) {
             UUID uuid = new UUID(info.getOffloadContext().getUidMsb(), info.getOffloadContext().getUidLsb());
-            futures.add(OffloadUtils.cleanupOffloaded(ledgerId, uuid, config,
+            OffloadUtils.cleanupOffloaded(ledgerId, uuid, config,
                     OffloadUtils.getOffloadDriverMetadata(info, config.getLedgerOffloader().getOffloadDriverMetadata()),
-                    "Trimming", name, scheduledExecutor));
+                    "Trimming", name, scheduledExecutor);
         }
         if (!futures.isEmpty()) {
             return FutureUtil.waitForAll(futures);
@@ -2967,32 +2967,32 @@ public class ManagedLedgerImpl implements ManagedLedger, CreateCallback {
         return CompletableFuture.completedFuture(null);
     }
 
-    private void asyncDeleteLedger(long ledgerId, long retry) {
-        asyncDeleteLedger(ledgerId, retry, null);
-    }
-    @VisibleForTesting
-    public CompletableFuture<Void> asyncDeleteLedger(long ledgerId, long retry,
-                                                      CompletableFuture<Void> callbackFuture) {
-        CompletableFuture<Void> future = callbackFuture == null ? new CompletableFuture<>() : callbackFuture;
+    public CompletableFuture<Void> asyncDeleteLedger(long ledgerId, long retry) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
         bookKeeper.asyncDeleteLedger(ledgerId, (rc, ctx) -> {
             if (isNoSuchLedgerExistsException(rc)) {
                 log.warn("[{}] Ledger was already deleted {}", name, ledgerId);
+                future.complete(null);
             } else if (rc != BKException.Code.OK) {
                 log.error("[{}] Error deleting ledger {} : {}", name, ledgerId, BKException.getMessage(rc));
                 if (retry - 1 <= 0) {
                     log.warn("[{}] Failed to delete ledger after retries {}", name, ledgerId);
                     future.completeExceptionally(new ManagedLedgerException(BKException.getMessage(rc)));
                 } else {
-                    scheduledExecutor.schedule(safeRun(() -> asyncDeleteLedger(ledgerId, retry - 1, future)),
+                    scheduledExecutor.schedule(safeRun(() -> asyncDeleteLedger(ledgerId, retry - 1)
+                                    .thenAccept((res) -> future.complete(null))
+                                    .exceptionally((e) -> {
+                                        future.completeExceptionally(e);
+                                        return null;
+                                    })),
                             DEFAULT_LEDGER_DELETE_BACKOFF_TIME_SEC, TimeUnit.SECONDS);
                 }
-                return;
             } else {
                 if (log.isDebugEnabled()) {
                     log.debug("[{}] Deleted ledger {}", name, ledgerId);
                 }
+                future.complete(null);
             }
-            future.complete(null);
         }, null);
         return future;
     }
