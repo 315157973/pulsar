@@ -140,6 +140,7 @@ public class TopicStatsImpl implements TopicStats {
     public long delayedMessageIndexSizeInBytes;
 
     /** Map of bucket delayed index statistics. */
+    @JsonIgnore
     public Map<String, TopicMetricBean> bucketDelayedIndexStats;
 
     /** The compaction stats. */
@@ -215,6 +216,7 @@ public class TopicStatsImpl implements TopicStats {
         this.lastOffloadFailureTimeStamp = 0;
         this.lastOffloadSuccessTimeStamp = 0;
         this.publishRateLimitedTimes = 0L;
+        this.earliestMsgPublishTimeInBacklogs = 0L;
         this.delayedMessageIndexSizeInBytes = 0;
         this.compaction.reset();
         this.ownerBroker = null;
@@ -313,6 +315,17 @@ public class TopicStatsImpl implements TopicStats {
                     this.replication.put(repl, replStats.add(stats.replication.get(repl)));
                 }
             }
+        }
+        if (earliestMsgPublishTimeInBacklogs != 0 && ((TopicStatsImpl) ts).earliestMsgPublishTimeInBacklogs != 0) {
+            earliestMsgPublishTimeInBacklogs = Math.min(
+                    earliestMsgPublishTimeInBacklogs,
+                    ((TopicStatsImpl) ts).earliestMsgPublishTimeInBacklogs
+            );
+        } else {
+            earliestMsgPublishTimeInBacklogs = Math.max(
+                    earliestMsgPublishTimeInBacklogs,
+                    ((TopicStatsImpl) ts).earliestMsgPublishTimeInBacklogs
+            );
         }
         return this;
     }
