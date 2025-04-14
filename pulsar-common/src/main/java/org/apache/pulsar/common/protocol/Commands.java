@@ -473,7 +473,7 @@ public class Commands {
     }
 
     public static long getEntryTimestamp(ByteBuf headersAndPayloadWithBrokerEntryMetadata) throws IOException {
-        // get broker timestamp first if BrokerEntryMetadata is enabled with AppendBrokerTimestampMetadataInterceptor
+        // get broker timestamp first if exists
         BrokerEntryMetadata brokerEntryMetadata =
                 Commands.parseBrokerEntryMetadataIfExist(headersAndPayloadWithBrokerEntryMetadata);
         if (brokerEntryMetadata != null && brokerEntryMetadata.hasBrokerTimestamp()) {
@@ -1725,6 +1725,9 @@ public class Commands {
             if (numberOfMessages >= 0) {
                 interceptor.interceptWithNumberOfMessages(brokerEntryMetadata, numberOfMessages);
             }
+        }
+        if (!brokerEntryMetadata.hasBrokerTimestamp()) {
+            brokerEntryMetadata.setBrokerTimestamp(System.currentTimeMillis());
         }
 
         int brokerMetaSize = brokerEntryMetadata.getSerializedSize();
